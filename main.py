@@ -69,12 +69,12 @@ def evaluate_stock(data: TickerInput):
         try:
             # current fy net income > last year > prior year
             if financials.iloc[0.0] > financials.iloc[0, 1] and financials.iloc[0, 1] > financials.iloc[0, 2]:
-                prior3yeargrowth = True
+                prior_3year_ni_growth = True
 
             # 1 - prior year / current year net income
-            net_income_growth =  1- financials.iloc[0, 1] / financials.iloc[0, 0]
+            net_income_growth =  ((financials.iloc[0, 0] -  financials.iloc[0, 1]) /  financials.iloc[0, 1])*100
             
-            if prior3yeargrowth and net_income_growth > net_income_growth_target:
+            if prior_3year_ni_growth and net_income_growth > net_income_growth_target:
                 total_score += 1
 
         except Exception:
@@ -87,18 +87,16 @@ def evaluate_stock(data: TickerInput):
                 
                 # yfinance columns are ordered chronologically backwards (Newest -> Oldest)
                 current_fy_revenue = revenue_series.iloc[0]
-                prior_fy_revenue = revenue_series.iloc[1]
+                last_fy_revenue = revenue_series.iloc[1]
+                prior_fy_revenue = revenue_series.iloc[2]
                 
-                # Fetch matching dates for verification
-                current_fy_date = revenue_series.index[0].strftime('%Y-%m-%d')
-                prior_fy_date = revenue_series.index[1].strftime('%Y-%m-%d')
+                if current_fy_revenue > last_fy_revenue > prior_fy_revenue: 
+                    yearly_revenue_increase = True
                 
-                #print(f"Current FY Revenue ({current_fy_date}): {current_fy_revenue:,}")
-                #print(f"Prior FY Revenue ({prior_fy_date}): {prior_fy_revenue:,}")
-                
-                # Optional: Calculate YoY Revenue Growth Rate (similar to your sheet logic)
-                
-                revenue_growth = (current_fy_revenue - prior_fy_revenue) / prior_fy_revenue
+                revenue_growth = ((current_fy_revenue - prior_fy_revenue) / prior_fy_revenue)*100
+
+                if revenue_growth >= net_income_growth and yearly_revenue_increase:
+                    total_score += 1
                 
                 # print(f"YoY Revenue Growth Rate: {revenue_growth}")
                 
@@ -151,7 +149,11 @@ def evaluate_stock(data: TickerInput):
             "current_price": current_price,
             "intrinsic_value": intrinsic_value,
             "total_score": f"{total_score}/12",
-            "conclusion": conclusion
+            "conclusion": conclusion,
+            "3.ni_growth" : net_income_growth,
+            "3.prior3yearNIgrowth" : prior_3year_ni_growth,
+            "4. yearly_revenue_growth" : yearly_revenue_increase,
+            "4.revenuegrowth" : revenue_growth
         }
         
     except Exception as e:
