@@ -33,6 +33,11 @@ class TickerInput(BaseModel):
 @app.post("/api/evaluate")
 def evaluate_stock(data: TickerInput):
     ticker_code = data.ticker.upper().strip()
+
+    # calculator variables
+    net_income_growth_target = 19
+    market_cap_target = 10000000000
+    peg_ratio_default = 99
     
     try:
         stock = yf.Ticker(ticker_code)
@@ -50,22 +55,58 @@ def evaluate_stock(data: TickerInput):
         market_cap = info.get('marketCap', 0)
         current_price = info.get('currentPrice', info.get('regularMarketPreviousClose', 0))
         exchange = info.get('exchange', 'Unknown')
-        peg_ratio = info.get('pegRatio', 99) # Default high if missing 
+        peg_ratio = info.get('pegRatio', peg_ratio_default) # Default high if missing 
         current_ratio = info.get('currentRatio', 0)
         
         # Score calculation initialized
         total_score = 0
         
         # 1. Market Cap Criteria (Score = 1 if Large Cap > $10B) 
-        if market_cap > 10_000_000_000:
+        if market_cap > market_cap_target:
             total_score += 1
             
-        # 3 & 4. Simple Trend Check Helper (Net Income / Revenue) 
+        # 3. Simple Trend Check Helper (Net Income) 
         try:
-            net_income_growth = financials.iloc[0, 0] > financials.iloc[0, 1]  # LY vs Prior Year 
-            if net_income_growth: total_score += 1
+            # current fy net income > last year > prior year
+            if financials.iloc[0.0] > financials.iloc[0, 1] and financials.iloc[0, 1] > financials.iloc[0, 2]:
+                prior3yeargrowth = True
+
+            # 1 - prior year / current year net income
+            net_income_growth =  1- financials.iloc[0, 1] / financials.iloc[0, 0]
+            
+            if prior3yeargrowth and net_income_growth > net_income_growth_target:
+                total_score += 1
+
         except Exception:
             pass
+
+        # 4 Extract Current and Prior FY Revenue safely
+        try:
+            if "Total Revenue" in financials.index:
+                revenue_series = financials.loc["Total Revenue"]
+                
+                # yfinance columns are ordered chronologically backwards (Newest -> Oldest)
+                current_fy_revenue = revenue_series.iloc[0]
+                prior_fy_revenue = revenue_series.iloc[1]
+                
+                # Fetch matching dates for verification
+                current_fy_date = revenue_series.index[0].strftime('%Y-%m-%d')
+                prior_fy_date = revenue_series.index[1].strftime('%Y-%m-%d')
+                
+                #print(f"Current FY Revenue ({current_fy_date}): {current_fy_revenue:,}")
+                #print(f"Prior FY Revenue ({prior_fy_date}): {prior_fy_revenue:,}")
+                
+                # Optional: Calculate YoY Revenue Growth Rate (similar to your sheet logic)
+                
+                revenue_growth = (current_fy_revenue - prior_fy_revenue) / prior_fy_revenue
+                
+                # print(f"YoY Revenue Growth Rate: {revenue_growth}")
+                
+            else:
+                print("Row item 'Total Revenue' not found in the financials statement.")
+                
+        except IndexError:
+            print("Insufficient historical revenue data to retrieve both current and prior fiscal years.")
 
         # 7. Return on Equity (ROE) Criteria (Score = 1 if ROE > 12%) 
         roe = info.get('returnOnEquity', 0) * 100
@@ -88,11 +129,11 @@ def evaluate_stock(data: TickerInput):
         # Final Decision Logic mimicking your spreadsheet's criteria 
         # In the sample sheet, low scores (< 5) result in a "SELL" 
         if total_score >= 5 and peg_ratio <= 1 and current_price < intrinsic_value:
-            conclusion = "BUY"
+            conclusion = "UNDERVALUED"
         elif total_score >= 4:
-            conclusion = "HOLD"
+            conclusion = "KEEP"
         else:
-            conclusion = "SELL"
+            conclusion = "OVERVALUED"
             
         # Store Evaluation Results into PostgreSQL DB
         conn = get_db_connection()
