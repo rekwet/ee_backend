@@ -71,8 +71,6 @@ def evaluate_stock(data: TickerInput):
         if market_cap > market_cap_target:
             total_score += 1
             
-        
-
         # 3 Net Income Check
         try:
             # 3.1. Safely lookup Net Income regardless of minor variation in yfinance index labels
