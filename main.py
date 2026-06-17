@@ -38,6 +38,11 @@ def evaluate_stock(data: TickerInput):
     net_income_growth_target = 19
     market_cap_target = 10000000000
     peg_ratio_default = 99
+
+    net_income_growth=0
+    prior_3year_ni_growth=0
+    yearly_revenue_increase=0
+    revenue_growth=0
     
     try:
         stock = yf.Ticker(ticker_code)
