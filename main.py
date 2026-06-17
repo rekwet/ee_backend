@@ -8,6 +8,10 @@ from psycopg2.extras import RealDictCursor
 
 app = FastAPI(title="EquityEdge Valuation Engine")
 
+@app.get("/")
+def home():
+    return {"status": "EquityEdge Engine is Online & Healthy"}
+
 # Enable CORS so your Hostinger frontend can communicate securely with the backend
 app.add_middleware(
     CORSMiddleware,
