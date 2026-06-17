@@ -34,16 +34,17 @@ class TickerInput(BaseModel):
 def evaluate_stock(data: TickerInput):
     ticker_code = data.ticker.upper().strip()
 
-    # calculator variables
+    # calculator variables - can be set by user in future
     net_income_growth_target = 19
     market_cap_target = 10000000000
     peg_ratio_default = 99
 
-    net_income_growth=0
-    prior_3year_ni_growth=0
-    yearly_revenue_increase=0
-    revenue_growth=0
-    
+    # Initialize evaluation flags and values safely outside the try block
+    net_income_growth=0.0
+    prior_3year_ni_growth=False
+    yearly_revenue_increase=False
+    revenue_growth=0.0
+
     try:
         stock = yf.Ticker(ticker_code)
         info = stock.info
@@ -70,20 +71,46 @@ def evaluate_stock(data: TickerInput):
         if market_cap > market_cap_target:
             total_score += 1
             
-        # 3. Simple Trend Check Helper (Net Income) 
+        
+
+        # 3 Net Income Check
         try:
-            # current fy net income > last year > prior year
-            if financials.iloc[0.0] > financials.iloc[0, 1] and financials.iloc[0, 1] > financials.iloc[0, 2]:
-                prior_3year_ni_growth = True
-
-            # 1 - prior year / current year net income
-            net_income_growth =  ((financials.iloc[0, 0] -  financials.iloc[0, 1]) /  financials.iloc[0, 1])*100
+            # 3.1. Safely lookup Net Income regardless of minor variation in yfinance index labels
+            net_income_labels = ["Net Income", "Net Income From Continuing Operation Net Minority Interest"]
+            net_income_series = None
             
-            if prior_3year_ni_growth and net_income_growth > net_income_growth_target:
-                total_score += 1
+            for label in net_income_labels:
+                if label in financials.index:
+                    net_income_series = financials.loc[label]
+                    break
 
-        except Exception:
-            pass
+            # 3.2. Verify we found the metric and have at least 3 years of historical rows to evaluate
+            if net_income_series is not None and len(net_income_series) >= 3:
+                
+                # yfinance annual DataFrames order headers from Newest to Oldest (Left to Right)
+                current_fy_ni = net_income_series.iloc[0]       # Index 0 = Current FY
+                last_year_ni  = net_income_series.iloc[1]       # Index 1 = Prior FY
+                prior_year_ni = net_income_series.iloc[2]       # Index 2 = 2 Years Ago
+                
+                # 3.2.1. Simple Trend Check: Current FY Net Income > Last Year > Prior Year
+                if current_fy_ni > last_year_ni and last_year_ni > prior_year_ni:
+                    prior_3year_ni_growth = True
+
+                # 3.2.2. Calculate YoY Net Income growth rate (using abs() for negative income recovery tracking)
+                if last_year_ni != 0:
+                    net_income_growth = ((current_fy_ni - last_year_ni) / abs(last_year_ni)) * 100
+                
+                # 3.2.3. Final metric scoring condition evaluation
+                if prior_3year_ni_growth and net_income_growth > net_income_growth_target:
+                    total_score += 1
+                    
+            else:
+                # Instead of swallowing errors blindly, print or log meaningful diagnostic issues
+                print("Skipping Net Income trend: Metric row missing or insufficient (3-year) column data.")
+
+        except Exception as e:
+            # Catch and log anomalies (e.g., unexpected data types or structures) without killing the app
+            print(f"Error encountered during Net Income helper validation: {str(e)}")
 
         # 4 Extract Current and Prior FY Revenue safely
         try:
