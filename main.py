@@ -15,9 +15,9 @@ def home():
 # Enable CORS so your Hostinger frontend can communicate securely with the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["equityedge.me"],  # Replace with your actual domain for production security
+    allow_origins=["https://equityedge.me", "https://www.equityedge.me"],  # Replace with your actual domain for production security
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["POST"],
     allow_headers=["*"],
 )
 
