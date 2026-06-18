@@ -131,41 +131,40 @@
     const BACKEND_URL = "https://ee-backend-y8s2.onrender.com/api/evaluate";
 
     async function runAnalysis() {
-        const tickerInput = document.getElementById('tickerInput');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const resultBox = document.getElementById('resultBox');
-        
-        const ticker = tickerInput.value.trim().toUpperCase();
-        
-        if (!ticker) {
-            alert("Please enter a stock ticker code.");
-            return;
+    const tickerInput = document.getElementById('tickerInput');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const resultBox = document.getElementById('resultBox');
+    
+    const ticker = tickerInput.value.trim().toUpperCase();
+    
+    if (!ticker) {
+        alert("Please enter a stock ticker code.");
+        return;
+    }
+
+    analyzeBtn.disabled = true;
+    resultBox.style.display = "block";
+    resultBox.className = "loading";
+    resultBox.innerText = `Analyzing ${ticker}... Fetching financial metrics and calculating intrinsic value.`;
+
+    try {
+        const response = await fetch(BACKEND_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ticker: ticker })
+        });
+
+        if (!response.ok) {
+            // Catches 500, 404, or 422 errors explicitly
+            throw new Error(`Server Error (Status ${response.status})`);
         }
 
-        // Setup loading state
-        analyzeBtn.disabled = true;
-        resultBox.style.display = "block";
-        resultBox.className = "loading";
-        resultBox.innerText = `Analyzing ${ticker}... Fetching financial metrics and calculating intrinsic value.`;
-
-        try {
-            const response = await fetch(BACKEND_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ ticker: ticker })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Server returned status ${response.status}`);
-            }
-
-            const data = await response.json();
-            
-            // Format the raw data into clean, readable text strings
-            resultBox.className = ""; 
-            resultBox.innerText = `
+        const data = await response.json();
+        
+        resultBox.className = ""; 
+        resultBox.innerText = `
 📊 ANALYSIS RESULTS FOR: ${data.ticker} (${data.exchange || 'N/A'})
 --------------------------------------------------
 • Current Market Price: $${Number(data.current_price).toFixed(2)}
@@ -177,16 +176,21 @@
 🎯 SCORE & CONCLUSION:
 • Total Checklist Score: ${data.total_score}
 • Final Verdict: ${data.conclusion.toUpperCase()}
-            `;
+        `;
 
-        } catch (error) {
-            resultBox.className = "error";
-            resultBox.innerText = `❌ Error analyzing ${ticker}.\nReason: Could not reach the backend engine or process financial data. Make sure your Render backend is awake and CORS is configured.`;
-            console.error("Analysis Error:", error);
-        } finally {
-            analyzeBtn.disabled = false;
+    } catch (error) {
+        resultBox.className = "error";
+        
+        if (error.message.includes("Server Error")) {
+            resultBox.innerText = `❌ Backend Error for ${ticker}.\n\nReason: Your frontend successfully connected to Middleware, but your the server threw a crash error while analyzing this stock. Check your Middleware Dashboard Logs to see the exact failure. \n\n(${error.message})`;
+        } else {
+            resultBox.innerText = `❌ Network / CORS Connection Error for ${ticker}.\n\nReason: Could not establish contact with the Middleware. Check that your Middleware instance is up, and your API working.`;
         }
+        console.error("Analysis Error Details:", error);
+    } finally {
+        analyzeBtn.disabled = false;
     }
+}
 
     // Allow pressing "Enter" key to trigger analysis
     document.getElementById('tickerInput').addEventListener('keypress', function(e) {
