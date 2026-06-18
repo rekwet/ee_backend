@@ -12,4 +12,4 @@ CREATE TABLE public.stock_analyses (
 );
 
 -- Optimization: Index the ticker column for lightning-fast lookups
-CREATE INDEX idx_stock_analyses_ticker ON stock_analyses(ticker);
+CREATE INDEX idx_stock_analyses_ticker ON public.stock_analyses(ticker);
