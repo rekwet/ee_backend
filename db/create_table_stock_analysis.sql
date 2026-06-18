@@ -1,4 +1,4 @@
-CREATE TABLE stock_analyses (
+CREATE TABLE public.stock_analyses (
     id SERIAL PRIMARY KEY,
     ticker VARCHAR(12) NOT NULL,
     exchange VARCHAR(20),
